@@ -1,0 +1,31 @@
+name: Test custom report name and pinned dockle version
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pull test image
+        run: docker pull hello-world
+
+      - id: action
+        uses: .
+        with:
+          image: hello-world
+          exit-code: "0"
+          report-format: json
+          report-name: my-custom-report
+          failure-threshold: FATAL
+          dockle-version: "0.4.14"
+
+      - name: Assert custom report file was created
+        run: |
+          echo "Checking for my-custom-report.json..."
+          if [ ! -f "my-custom-report.json" ]; then
+            echo "FAIL: my-custom-report.json was not created"
+            exit 1
+          fi
+          echo "PASS: my-custom-report.json exists"
+          cat my-custom-report.json
