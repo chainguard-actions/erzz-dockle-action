@@ -1,0 +1,39 @@
+name: Test basic usage with hello-world image
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pull test image
+        run: docker pull hello-world
+
+      - id: action
+        uses: .
+        with:
+          image: hello-world
+          report-format: json
+          report-name: dockle-report
+          failure-threshold: FATAL
+          exit-code: "0"
+
+      - name: Assert report file was created
+        run: |
+          echo "Checking for dockle-report.json..."
+          if [ ! -f "dockle-report.json" ]; then
+            echo "FAIL: dockle-report.json was not created"
+            exit 1
+          fi
+          echo "PASS: dockle-report.json exists"
+
+      - name: Assert report file is valid JSON
+        run: |
+          echo "Validating JSON content..."
+          if ! python3 -m json.tool dockle-report.json > /dev/null 2>&1; then
+            echo "FAIL: dockle-report.json is not valid JSON"
+            cat dockle-report.json
+            exit 1
+          fi
+          echo "PASS: dockle-report.json is valid JSON"

@@ -1,0 +1,45 @@
+name: Test SARIF report format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pull test image
+        run: docker pull hello-world
+
+      - id: action
+        uses: .
+        with:
+          image: hello-world
+          report-format: sarif
+          report-name: dockle-sarif-report
+          failure-threshold: FATAL
+          exit-code: "0"
+
+      - name: Assert SARIF report file was created
+        run: |
+          echo "Checking for dockle-sarif-report.sarif..."
+          if [ ! -f "dockle-sarif-report.sarif" ]; then
+            echo "FAIL: dockle-sarif-report.sarif was not created"
+            exit 1
+          fi
+          echo "PASS: dockle-sarif-report.sarif exists"
+
+      - name: Assert SARIF report is valid JSON with expected schema
+        run: |
+          echo "Validating SARIF content..."
+          if ! python3 -m json.tool dockle-sarif-report.sarif > /dev/null 2>&1; then
+            echo "FAIL: dockle-sarif-report.sarif is not valid JSON"
+            cat dockle-sarif-report.sarif
+            exit 1
+          fi
+          # SARIF files should contain the $schema or version field
+          if ! grep -q '"version"' dockle-sarif-report.sarif && ! grep -q 'sarif' dockle-sarif-report.sarif; then
+            echo "FAIL: SARIF file does not appear to be a valid SARIF document"
+            cat dockle-sarif-report.sarif
+            exit 1
+          fi
+          echo "PASS: dockle-sarif-report.sarif is a valid SARIF document"
