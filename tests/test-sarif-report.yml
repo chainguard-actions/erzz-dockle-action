@@ -1,0 +1,29 @@
+name: Test SARIF report format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Pull test image
+        run: docker pull alpine:3.18
+      - id: action
+        uses: .
+        with:
+          image: alpine:3.18
+          report-format: sarif
+          report-name: dockle-sarif-report
+          failure-threshold: FATAL
+          exit-code: "0"
+          dockle-version: latest
+      - name: Assert SARIF report file was created
+        run: |
+          echo "Checking for dockle-sarif-report.sarif..."
+          if [ ! -f "dockle-sarif-report.sarif" ]; then
+            echo "FAIL: dockle-sarif-report.sarif was not created"
+            exit 1
+          fi
+          echo "PASS: dockle-sarif-report.sarif exists"
+          echo "Report contents:"
+          cat dockle-sarif-report.sarif
