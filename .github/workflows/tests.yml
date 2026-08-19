@@ -1,0 +1,54 @@
+name: Tests
+on: push
+
+permissions: {}
+
+jobs:
+  # <---------------- TEST BASIC CONFIG ------------------>
+  basic-pass:
+    name: Basic success condition
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Basic Test
+        uses: ./
+        with:
+         image: alpine:latest
+         accept-extensions: pem
+         exit-code: 0
+         report-name: basic-success
+
+      - name: Upload Reports
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: Basic Success Report
+          path: basic-success.json
+
+  # <--------------- TEST ADVANCED CONFIG ---------------->
+  advanced:
+    name: Advanced
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Advanced Test
+        uses: ./
+        with:
+          image: alpine:latest
+          report-format: sarif
+          report-name: dockle
+          failure-threshold: fatal
+          exit-code: 0
+          dockle-version: 0.4.13
+          accept-extensions: pem
+
+      - name: Upload Reports
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: SARIF Report
+          path: dockle.sarif

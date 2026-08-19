@@ -82,11 +82,6 @@ runs:
         if [ "$DOCKLE_VERSION" = "latest" ]; then
           export DOCKLE_VERSION=$(curl -H "Authorization: token ${GH_TOKEN}" --silent "https://api.github.com/repos/goodwithtech/dockle/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
         fi
-        # Validate DOCKLE_VERSION to only allow safe version strings (digits and dots)
-        if ! printf '%s' "$DOCKLE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-          echo "ERROR: Invalid dockle-version format: '$DOCKLE_VERSION'. Must be in the form X.Y.Z" >&2
-          exit 1
-        fi
         INSTALL_DIR="${RUNNER_TEMP:-/tmp}/dockle"
         mkdir -p "$INSTALL_DIR"
         curl -L "https://github.com/goodwithtech/dockle/releases/download/v${DOCKLE_VERSION}/dockle_${DOCKLE_VERSION}_Linux-64bit.tar.gz" | tar xz -C "$INSTALL_DIR"

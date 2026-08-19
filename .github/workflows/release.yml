@@ -1,0 +1,101 @@
+name: Release
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new_release_published: ${{ steps.semantic-release.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic-release.outputs.new_release_version }}
+      new_release_major_version: ${{ steps.semantic-release.outputs.new_release_major_version }}
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Get Configuration
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Fetching default configuration from erzz/configs..."
+          curl --header "authorization: Bearer ${GITHUB_TOKEN}" \
+            --header 'Accept: application/vnd.github.v3.raw' \
+            --location https://api.github.com/repos/erzz/configs/contents/configs/semantic-release-config.json \
+            --fail \
+            --output .releaserc.json || exit 1
+          cat .releaserc.json
+
+      - name: Semantic Release
+        id: semantic-release
+        uses: cycjimmy/semantic-release-action@16ca923e6ccbb50770c415a0ccd43709a8c5f7a4 # v4.2.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            conventional-changelog-conventionalcommits
+            @semantic-release/exec
+
+  floating-tag:
+    name: Create floating tag
+    needs: release
+    if: ${{ needs.release.outputs.new_release_published == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Get Release SHA
+        id: sha
+        env:
+          NEW_RELEASE_VERSION: ${{ needs.release.outputs.new_release_version }}
+        run: |
+          SHA=$(git show-ref --hash "v${NEW_RELEASE_VERSION}")
+          echo "SHA for v${NEW_RELEASE_VERSION}: $SHA"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Create floating tag
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+          NEW_RELEASE_MAJOR_VERSION: ${{ needs.release.outputs.new_release_major_version }}
+        with:
+          github-token: ${{ secrets.RELEASE_TOKEN }}
+          script: |-
+            const sha = process.env.SHA;
+            const major = `v${process.env.NEW_RELEASE_MAJOR_VERSION}`;
+
+            // If exists then update, else create
+            try {
+              await github.rest.git.updateRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${major}`,
+                sha: sha,
+                force: true,
+              });
+              core.info(`Updated ${major} to ${sha}`);
+            } catch(err) {
+              core.info(`Failed to update ${major}: ${err}`);
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/${major}`,
+                sha: sha,
+              });
+              core.info(`Created ${major} at ${sha}`);
+            }

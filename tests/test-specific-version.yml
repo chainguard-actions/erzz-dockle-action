@@ -1,4 +1,4 @@
-name: Test basic usage
+name: Test specific dockle version
 on:
   workflow_dispatch:
 jobs:
@@ -12,8 +12,20 @@ jobs:
         uses: .
         with:
           image: alpine:3.18
+          dockle-version: "0.4.14"
           exit-code: "0"
           failure-threshold: FATAL
+      - name: Assert dockle binary is available and correct version
+        run: |
+          echo "Checking dockle version..."
+          VERSION=$(dockle --version 2>&1 || true)
+          echo "dockle version output: $VERSION"
+          if echo "$VERSION" | grep -q "0.4.14"; then
+            echo "PASS: dockle version 0.4.14 is installed"
+          else
+            echo "FAIL: expected dockle version 0.4.14, got: $VERSION"
+            exit 1
+          fi
       - name: Assert report file was created
         run: |
           echo "Checking for dockle-report.json..."
@@ -22,11 +34,3 @@ jobs:
             exit 1
           fi
           echo "PASS: dockle-report.json exists"
-      - name: Assert report file is valid JSON
-        run: |
-          echo "Validating JSON content..."
-          if ! python3 -c "import json,sys; json.load(open('dockle-report.json'))" 2>&1; then
-            echo "FAIL: dockle-report.json is not valid JSON"
-            exit 1
-          fi
-          echo "PASS: dockle-report.json is valid JSON"

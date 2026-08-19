@@ -8,37 +8,58 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
-Action **erzz--dockle-action/v1.4.1** was hardened automatically. 2 finding(s) were identified and resolved across 1 iteration(s).
+Action **erzz--dockle-action/v1.4.1** was hardened automatically. 4 finding(s) were identified and resolved across 1 iteration(s).
 
 ## Findings Fixed
 
 ### script-injection (severity: high)
 
-Rule (b) violation: In the 'Run Dockle' step, the env var $EXIT_CODE (sourced from inputs.exit-code, a workflow-controllable value) is used unquoted in the run block: `dockle --exit-code $EXIT_CODE --exit-level "$FAILURE_THRESHOLD" "$IMAGE"`. An attacker could inject shell metacharacters via this input. Fix: quote it as "$EXIT_CODE".
+Rule (a): ${{ }} expressions are interpolated directly inside run: shell command strings in the 'Get Release SHA' step. Line 53: `SHA=$(git show-ref --hash v${{ needs.release.outputs.new_release_version }})` and line 54: `echo "SHA for v${{ needs.release.outputs.new_release_version }}: $SHA"`. The value of needs.release.outputs.new_release_version flows through YAML template substitution before the shell sees it, enabling script injection. Additionally, line 21 interpolates `${{ secrets.GITHUB_TOKEN }}` directly inside a curl command in a run: block.
 
 Locations:
 
-- `action.yml:73`
+- `.github/workflows/release.yml:21`
+- `.github/workflows/release.yml:53`
+- `.github/workflows/release.yml:54`
 
 ### script-injection (severity: high)
 
-Rule (b) violation: In the 'Install Dockle' step, the env var ${DOCKLE_VERSION} (sourced from inputs.dockle-version, a workflow-controllable value) is used unquoted inside a curl URL string: `curl -L "https://github.com/goodwithtech/dockle/releases/download/v${DOCKLE_VERSION}/dockle_${DOCKLE_VERSION}_Linux-64bit.tar.gz" | tar xz -C "$INSTALL_DIR"`. While inside double quotes, the variable expansion is not separately sanitized and an attacker-controlled version string could inject characters. Fix: validate or sanitize DOCKLE_VERSION before interpolating into the URL.
+Rule (b): In action.yml, the env var $EXIT_CODE (sourced from inputs.exit-code, a workflow-controllable value) is used unquoted in the run: block: `dockle --exit-code $EXIT_CODE --exit-level "$FAILURE_THRESHOLD" "$IMAGE"`. An unquoted shell expansion allows shell metacharacters in the input value to be interpreted by the shell.
 
 Locations:
 
-- `action.yml:68`
+- `action.yml:83`
+
+### missing-permissions (severity: medium)
+
+The workflow file release.yml has no top-level `permissions:` key and neither of its jobs (release, floating-tag) defines a job-level `permissions:` block. This means the workflow runs with the default (overly broad) GitHub Actions token permissions.
+
+Locations:
+
+- `.github/workflows/release.yml:1`
+
+### missing-permissions (severity: medium)
+
+The workflow file tests.yml has no top-level `permissions:` key and neither of its jobs (basic-pass, advanced) defines a job-level `permissions:` block. This means the workflow runs with the default (overly broad) GitHub Actions token permissions.
+
+Locations:
+
+- `.github/workflows/tests.yml:1`
 
 ## Iteration Notes
 
 ### Iteration 1
 
-**Fixes applied:** script-injection
+**Fixes applied:** script-injection, missing-permissions
 
 **Notes:**
 
-Fixed two script-injection findings in action.yml:
-1. Quoted `$EXIT_CODE` as `"$EXIT_CODE"` in the 'Run Dockle' step's dockle command (line 73) to prevent shell metacharacter injection from the exit-code input.
-2. Added strict validation of `DOCKLE_VERSION` in the 'Install Dockle' step using a regex (`^[0-9]+\.[0-9]+\.[0-9]+$`) before interpolating it into the curl URL. This ensures only safe X.Y.Z version strings are accepted, blocking any shell metacharacter injection via the dockle-version input. The validation applies to both user-supplied versions and the version resolved from the GitHub API when 'latest' is specified.
+Fixed all 4 findings:
+1. release.yml line 21: Moved `${{ secrets.GITHUB_TOKEN }}` into step env block as `GITHUB_TOKEN`, referenced as `${GITHUB_TOKEN}` in curl command.
+2. release.yml lines 53-54: Moved `${{ needs.release.outputs.new_release_version }}` into step env block as `NEW_RELEASE_VERSION`, referenced as `${NEW_RELEASE_VERSION}` in shell. Also moved `${{ needs.release.outputs.new_release_major_version }}` to env block in the github-script step, referenced via `process.env.NEW_RELEASE_MAJOR_VERSION`.
+3. action.yml line 83: Quoted `$EXIT_CODE` → `"$EXIT_CODE"` to prevent shell metacharacter injection.
+4. release.yml: Added top-level `permissions: contents: write` and per-job `permissions: contents: write` for both jobs (needed for tag/release creation).
+5. tests.yml: Added top-level `permissions: {}` since no special permissions are needed.
 
