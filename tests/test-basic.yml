@@ -1,0 +1,39 @@
+name: Test basic usage - JSON report
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pull test image
+        run: docker pull hello-world
+
+      - id: action
+        uses: .
+        with:
+          image: hello-world
+          report-format: json
+          report-name: dockle-report
+          failure-threshold: FATAL
+          exit-code: "0"
+
+      - name: Assert report file was created
+        run: |
+          echo "Checking for dockle-report.json..."
+          if [ ! -f "dockle-report.json" ]; then
+            echo "FAIL: dockle-report.json was not created"
+            exit 1
+          fi
+          echo "PASS: dockle-report.json exists"
+
+      - name: Assert report file is valid JSON
+        run: |
+          echo "Validating JSON content..."
+          if ! python3 -c "import json,sys; json.load(open('dockle-report.json'))" 2>/dev/null; then
+            echo "FAIL: dockle-report.json is not valid JSON"
+            cat dockle-report.json || true
+            exit 1
+          fi
+          echo "PASS: dockle-report.json is valid JSON"

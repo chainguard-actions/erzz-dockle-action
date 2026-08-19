@@ -1,0 +1,41 @@
+name: Test specific dockle version
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pull test image
+        run: docker pull hello-world
+
+      - id: action
+        uses: .
+        with:
+          image: hello-world
+          report-format: json
+          report-name: dockle-report
+          failure-threshold: FATAL
+          exit-code: "0"
+          dockle-version: "0.4.14"
+
+      - name: Assert dockle is installed with correct version
+        run: |
+          echo "Checking dockle version..."
+          INSTALLED_VERSION=$(dockle --version 2>&1 || true)
+          echo "Installed version output: $INSTALLED_VERSION"
+          if ! echo "$INSTALLED_VERSION" | grep -q "0.4.14"; then
+            echo "FAIL: Expected dockle version 0.4.14 but got: $INSTALLED_VERSION"
+            exit 1
+          fi
+          echo "PASS: dockle version 0.4.14 is installed"
+
+      - name: Assert report file was created
+        run: |
+          echo "Checking for dockle-report.json..."
+          if [ ! -f "dockle-report.json" ]; then
+            echo "FAIL: dockle-report.json was not created"
+            exit 1
+          fi
+          echo "PASS: dockle-report.json exists"
