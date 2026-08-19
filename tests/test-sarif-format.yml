@@ -1,0 +1,31 @@
+name: Test SARIF format output
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        with:
+          image: alpine:3.18
+          report-format: sarif
+          report-name: dockle-sarif-report
+          failure-threshold: FATAL
+          exit-code: "0"
+      - name: Assert SARIF report file was created
+        run: |
+          if [ ! -f "dockle-sarif-report.sarif" ]; then
+            echo "FAIL: expected dockle-sarif-report.sarif to exist"
+            exit 1
+          fi
+          echo "PASS: dockle-sarif-report.sarif exists"
+      - name: Assert SARIF report contains expected schema
+        run: |
+          if ! grep -q "sarifVersion\|runs\|results" dockle-sarif-report.sarif; then
+            echo "FAIL: dockle-sarif-report.sarif does not appear to be a valid SARIF file"
+            cat dockle-sarif-report.sarif
+            exit 1
+          fi
+          echo "PASS: dockle-sarif-report.sarif contains expected SARIF fields"

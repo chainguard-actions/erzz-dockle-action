@@ -1,0 +1,39 @@
+name: Test SARIF report format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pull test image
+        run: docker pull hello-world:latest
+
+      - id: action
+        uses: .
+        with:
+          image: hello-world:latest
+          report-format: "sarif"
+          report-name: "my-dockle-report"
+          exit-code: "0"
+          failure-threshold: "FATAL"
+
+      - name: Assert SARIF report file was created with custom name
+        run: |
+          echo "Checking for my-dockle-report.sarif..."
+          if [ ! -f "my-dockle-report.sarif" ]; then
+            echo "FAIL: my-dockle-report.sarif was not created"
+            exit 1
+          fi
+          echo "PASS: my-dockle-report.sarif exists"
+          cat my-dockle-report.sarif
+
+      - name: Assert SARIF report contains expected structure
+        run: |
+          echo "Validating SARIF structure..."
+          if ! grep -q '"version"' my-dockle-report.sarif; then
+            echo "FAIL: SARIF report does not contain 'version' field"
+            exit 1
+          fi
+          echo "PASS: SARIF report has expected structure"

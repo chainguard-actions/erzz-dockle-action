@@ -1,0 +1,40 @@
+name: Test custom report name
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pull test image
+        run: docker pull hello-world:latest
+
+      - id: action
+        uses: .
+        with:
+          image: hello-world:latest
+          report-format: "json"
+          report-name: "custom-scan-report"
+          exit-code: "0"
+          failure-threshold: "FATAL"
+
+      - name: Assert custom-named JSON report file was created
+        run: |
+          echo "Checking for custom-scan-report.json..."
+          if [ ! -f "custom-scan-report.json" ]; then
+            echo "FAIL: custom-scan-report.json was not created"
+            exit 1
+          fi
+          echo "PASS: custom-scan-report.json exists"
+          cat custom-scan-report.json
+
+      - name: Assert JSON report is valid JSON
+        run: |
+          echo "Validating JSON format..."
+          if ! python3 -m json.tool custom-scan-report.json > /dev/null 2>&1; then
+            echo "FAIL: custom-scan-report.json is not valid JSON"
+            cat custom-scan-report.json
+            exit 1
+          fi
+          echo "PASS: custom-scan-report.json is valid JSON"

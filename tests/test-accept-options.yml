@@ -1,0 +1,34 @@
+name: Test accept options (keywords, filenames, extensions)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pull test image
+        run: docker pull alpine:latest
+
+      - id: action
+        uses: .
+        with:
+          image: alpine:latest
+          report-format: "json"
+          report-name: "accept-test-report"
+          exit-code: "0"
+          failure-threshold: "FATAL"
+          accept-keywords: "secret,password"
+          accept-filenames: ".env,.secret"
+          accept-extensions: ".pem,.key"
+          timeout: "5m"
+
+      - name: Assert report file was created
+        run: |
+          echo "Checking for accept-test-report.json..."
+          if [ ! -f "accept-test-report.json" ]; then
+            echo "FAIL: accept-test-report.json was not created"
+            exit 1
+          fi
+          echo "PASS: accept-test-report.json exists"
+          cat accept-test-report.json
