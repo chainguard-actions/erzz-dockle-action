@@ -1,0 +1,40 @@
+name: Test accept options
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Pull hello-world image
+        run: docker pull hello-world
+
+      - id: action
+        uses: .
+        with:
+          image: hello-world
+          exit-code: "0"
+          failure-threshold: FATAL
+          report-format: json
+          report-name: dockle-accept-report
+          accept-keywords: "secret,password"
+          accept-filenames: ".env"
+          accept-extensions: ".pem,.key"
+
+      - name: Assert report file was created
+        run: |
+          if [ ! -f "dockle-accept-report.json" ]; then
+            echo "FAIL: expected dockle-accept-report.json to exist"
+            exit 1
+          fi
+          echo "PASS: dockle-accept-report.json exists"
+
+      - name: Assert report file is valid JSON
+        run: |
+          if ! cat dockle-accept-report.json | python3 -m json.tool > /dev/null 2>&1; then
+            echo "FAIL: dockle-accept-report.json is not valid JSON"
+            cat dockle-accept-report.json
+            exit 1
+          fi
+          echo "PASS: dockle-accept-report.json is valid JSON"
